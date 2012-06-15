@@ -1,7 +1,7 @@
 
 # setup virtualenv and virtualenvwrapper
-if [ $USER == deploy ]; then
-  export WORKON_HOME=$HOME/.virtualenvs
+if [ $USER == ubuntu ]; then
+  export WORKON_HOME=/virtualenvs
   source /usr/local/bin/virtualenvwrapper.sh
 fi
 
