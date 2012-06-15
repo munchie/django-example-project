@@ -1,12 +1,12 @@
 from __future__ import with_statement
-from fabric.api import run, sudo, put, env, require, local, settings
+from fabric.api import run, sudo, put, env, require, local, settings, prefix, cd
 from fabric.contrib.console import confirm
 import os
 import subprocess
 
 
 env.sites_dir           = "/srv/sites"
-env.virtualenv_dir      = ".virtualenvs"
+env.virtualenv_dir      = "/virtualenvs"
 env.git_repo            = "git://github.com/munchie/django-example-project.git"
 env.virtualenv          = "webapp"
 env.nginx_conf          = "nginx_webapp.conf"
@@ -18,6 +18,9 @@ env.deploy_user         = "deploy"
 env.deploy_user_home    = "/home/deploy"
 env.code_dir            = os.path.join(env.sites_dir, env.virtualenv)
 env.project_dir         = os.path.join(env.code_dir, env.project_name)
+env.db_name             = "webapp"
+env.db_user             = "webapp"
+env.bash_profile        = ".bash_profile"
 
 
 # These are the packages we need to install using aptitude install
@@ -65,6 +68,7 @@ def vagrant():
     env.key_filename    = ssh_config["IdentityFile"]
     env.django_settings = "settings.development"
     env.branch          = "master"
+    env.bash_profile    = ".vagrant_profile"
 
 
 # Provision instance
@@ -90,14 +94,14 @@ def setup_vagrant():
 # Sub commands
 def start_processes():
     """Starts nginx and gunicorn"""
-    sudo("start %(nginx)s" % env)
+    sudo("service nginx start")
     sudo("start %(gunicorn)s" % env)
 
 
 def stop_processes():
     """Stops nginx and gunicorn"""
     with settings(warn_only=True):
-        sudo("stop %(nginx)s" % env)
+        sudo("service nginx stop")
         sudo("stop %(gunicorn)s" % env)
 
 
@@ -106,6 +110,9 @@ def add_deploy_user():
     with settings(warn_only=True):
         if run("id %(deploy_user)s" % env).failed:
             sudo("useradd -d %(deploy_user_home)s -m -s /bin/bash deploy" % env)
+        if run("groups %(user)s | grep %(deploy_user)s" % env).failed:
+            # add the env.user to the deploy group so that we can work with the virtualenv
+            sudo("usermod -aG %(deploy_user)s %(user)s" % env)
 
 
 def install_packages():
@@ -117,37 +124,42 @@ def install_packages():
     # remove default nginx configuration
     sudo("rm -f /etc/nginx/sites-enabled/default")
     # create gunicorn log directory
-    sudo("mdkir -p /var/log/gunicorn")
+    sudo("mkdir -p /var/log/gunicorn")
 
 
 def make_virtualenv():
     """Create the virtualenv and set the DJANGO_SETTINGS_MODULE"""
+    # create dir for storing virtualenvs
+    sudo("mkdir -p %(virtualenv_dir)s" % env)
+    sudo("chown -R %(deploy_user)s:%(deploy_user)s %(virtualenv_dir)s" % env)
+    sudo("chmod -R 775 %(virtualenv_dir)s" % env)
+
     # setup virtualenvwrapper in the user's .bash_profile. Note see this post about why we use .bash_profile instead of .bashrc
     # http://brianna.laugher.id.au/blog/62/getting-virtualenvwrapper-and-fabric-to-play-nice
-    put('config/.bash_profile', '%(deploy_user_home)s/.bash_profile' % env)
+    put('config/%(bash_profile)s' % env, '~/.bash_profile')
     with settings(warn_only=True):
-        if sudo('grep "source /usr/local/bin/virtualenvwrapper.sh" ~/.bashrc', user=env.deploy_user).failed:
-            sudo('cat ~/.bash_profile >> ~/.bashrc', user=env.deploy_user)
+        if run('grep "source /usr/local/bin/virtualenvwrapper.sh" ~/.bashrc').failed:
+            run('cat ~/.bash_profile >> ~/.bashrc')
 
     # in case the virtualenv already exists we remove it
     with settings(warn_only=True):
-        sudo("rmvirtualenv %(virtualenv)s" % env, user=env.deploy_user)
+        run("rmvirtualenv %(virtualenv)s" % env)
 
     # create the virtualenv and add project_dir to PYTHONPATH
-    sudo("mkvirtualenv --no-site-packages %(virtualenv)s" % env, user=env.deploy_user)
+    run("mkvirtualenv --no-site-packages %(virtualenv)s" % env)
     with prefix('workon %(virtualenv)s' % env):
-        sudo("add2virtualenv %(project_dir)s" % env, user=env.deploy_user)
+        run("add2virtualenv %(project_dir)s" % env)
 
     # setup DJANGO_SETTINGS_MODULE in virtualenvwrapper's postactivate and postdeactivate hooks
-    sudo('echo "export DJANGO_SETTINGS_MODULE=%(django_settings)s" >> ~/%(virtualenv_dir)s/%(virtualenv)s/bin/postactivate' % env, user=env.deploy_user)
-    sudo('echo "unset DJANGO_SETTINGS_MODULE >> ~/%(virtualenv_dir)s/%(virtualenv)s/bin/postdeactivate"' % env, user=env.deploy_user)
+    run('echo "export DJANGO_SETTINGS_MODULE=%(django_settings)s" >> %(virtualenv_dir)s/%(virtualenv)s/bin/postactivate' % env)
+    run('echo "unset DJANGO_SETTINGS_MODULE" >> %(virtualenv_dir)s/%(virtualenv)s/bin/postdeactivate' % env)
 
 
 def setup_sites_dir():
     """Make the sites directory for deploying the source code"""
     # setup sites location
     sudo("mkdir -p %(sites_dir)s" % env)
-    sudo("chown %(deploy_user)s:%(deploy_user)s %(sites_dir)s" % env)
+    sudo("chown -R %(deploy_user)s:%(deploy_user)s %(sites_dir)s" % env)
 
 
 def setup_db():
@@ -182,29 +194,29 @@ def requirements():
     """Updates the requirements in the virtualenv"""
     with cd(env.code_dir):
         with prefix('workon %(virtualenv)s' % env):
-            sudo("pip install -r requirements.txt", user=env.deploy_user)
+            run("pip install -r requirements.txt")
 
 
 def syncdb():
     """Syncs the database"""
     with prefix('workon %(virtualenv)s' % env):
-        sudo('django-admin.py syncdb', user=env.deploy_user)
+        run('django-admin.py syncdb')
 
 
 def migrate(app=None):
     """Migrate the database"""
     with prefix('workon %(virtualenv)s' % env):
         if app:
-            sudo('django-admin.py migrate %s' % app, user=env.deploy_user)
+            run('django-admin.py migrate %s' % app)
         else:
-            sudo('django-admin.py migrate', user=env.deploy_user)
+            run('django-admin.py migrate')
 
 
 def collectstatic():
     """Collect static files into static folder"""
     with settings(warn_only=True):
         with prefix('workon %(virtualenv)s' % env):
-            sudo('django-admin.py collectstatic -l', user=env.deploy_user)
+            run('django-admin.py collectstatic -l')
 
 
 def gunicorn_config():
