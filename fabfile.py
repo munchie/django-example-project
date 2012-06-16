@@ -14,8 +14,6 @@ env.nginx               = "nginx_webapp"
 env.gunicorn_conf       = "gunicorn_webapp.conf"
 env.gunicorn            = "gunicorn_webapp"
 env.project_name        = "myproject"
-env.deploy_user         = "deploy"
-env.deploy_user_home    = "/home/deploy"
 env.code_dir            = os.path.join(env.sites_dir, env.virtualenv)
 env.project_dir         = os.path.join(env.code_dir, env.project_name)
 env.db_name             = "webapp"
@@ -76,7 +74,6 @@ def setup_vagrant():
     """Bootstraps the Vagrant environment"""
     require('hosts', provided_by=[vagrant])
     stop_processes()
-    add_deploy_user()
     install_packages()
     make_virtualenv()
     setup_sites_dir()
@@ -105,16 +102,6 @@ def stop_processes():
         sudo("stop %(gunicorn)s" % env)
 
 
-def add_deploy_user():
-    """Add a deploy user for deploying the code"""
-    with settings(warn_only=True):
-        if run("id %(deploy_user)s" % env).failed:
-            sudo("useradd -d %(deploy_user_home)s -m -s /bin/bash deploy" % env)
-        if run("groups %(user)s | grep %(deploy_user)s" % env).failed:
-            # add the env.user to the deploy group so that we can work with the virtualenv
-            sudo("usermod -aG %(deploy_user)s %(user)s" % env)
-
-
 def install_packages():
     """Install required packages"""
     sudo("aptitude update")
@@ -131,8 +118,7 @@ def make_virtualenv():
     """Create the virtualenv and set the DJANGO_SETTINGS_MODULE"""
     # create dir for storing virtualenvs
     sudo("mkdir -p %(virtualenv_dir)s" % env)
-    sudo("chown -R %(deploy_user)s:%(deploy_user)s %(virtualenv_dir)s" % env)
-    sudo("chmod -R 775 %(virtualenv_dir)s" % env)
+    sudo("chown %(user)s:%(user)s %(virtualenv_dir)s" % env)
 
     # setup virtualenvwrapper in the user's .bash_profile. Note see this post about why we use .bash_profile instead of .bashrc
     # http://brianna.laugher.id.au/blog/62/getting-virtualenvwrapper-and-fabric-to-play-nice
@@ -159,7 +145,7 @@ def setup_sites_dir():
     """Make the sites directory for deploying the source code"""
     # setup sites location
     sudo("mkdir -p %(sites_dir)s" % env)
-    sudo("chown -R %(deploy_user)s:%(deploy_user)s %(sites_dir)s" % env)
+    sudo("chown %(user)s:%(user)s %(sites_dir)s" % env)
 
 
 def setup_db():
@@ -176,7 +162,7 @@ def clone_repo():
     """Clone the git repo to the code directory"""
     with settings(warn_only=True):
         if run('test -d %(code_dir)s' % env).failed:
-            sudo('git clone %(git_repo)s %(code_dir)s' % env, user=env.deploy_user)
+            run('git clone %(git_repo)s %(code_dir)s' % env)
 
 
 def push():
@@ -187,7 +173,7 @@ def push():
 def pull():
     """Pull new code"""
     with cd(env.code_dir):
-        sudo('git pull', user=env.deploy_user)
+        run('git pull')
 
 
 def requirements():
