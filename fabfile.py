@@ -29,6 +29,7 @@ INSTALL_PACKAGES_WEB = [
     "nginx",
     "libevent-dev",
     "postgresql-server-dev-9.1",
+    "postgresql-client",
     "libpq-dev"
 ]
 
@@ -37,7 +38,11 @@ INSTALL_PACKAGES_DB = [
     "vim",
     "ntp",
     "git",
-    "postgresql"
+    "python2.7-dev",
+    "python-setuptools",
+    "build-essential",
+    "postgresql",
+    "postgresql-client"
 ]
 
 
@@ -132,7 +137,7 @@ def start_db_process():
     sudo("service postgresql start")
 
 
-def start_db_process():
+def stop_db_process():
     """Stops postgresql"""
     with settings(warn_only=True):
         sudo("service postgresql stop")
