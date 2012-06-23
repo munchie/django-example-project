@@ -122,14 +122,14 @@ def setup_vagrant_db():
 def start_web_processes():
     """Starts nginx and gunicorn"""
     sudo("service nginx start")
-    sudo("service gunicorn start")
+    sudo("start gunicorn")
 
 
 def stop_web_processes():
     """Stops nginx and gunicorn"""
     with settings(warn_only=True):
         sudo("service nginx stop")
-        sudo("service gunicorn stop")
+        sudo("stop gunicorn")
 
 
 def start_db_process():
@@ -220,7 +220,7 @@ def gunicorn_config():
     """Updates the gunicorn upstart config file"""
     with cd("/etc/init"):
         sudo("rm -f gunicorn.conf")
-        sudo("ln -sf %(code_dir)s/config/gunicorn/gunicorn.conf ." % env)
+        sudo("cp %(code_dir)s/config/gunicorn/gunicorn.conf ." % env)
 
 
 def setup_nginx():
@@ -287,9 +287,9 @@ def collectstatic():
 def restart_gunicorn():
     """Restarts gunicorn"""
     with settings(warn_only=True):
-        # Note: Upstart reload does not pick up changes to the conf file.
-        sudo("service gunicorn stop")
-        sudo("service gunicorn start")
+        # Note: Upstart reload or restart does not pick up changes to the conf file.
+        sudo("stop gunicorn")
+        sudo("start gunicorn")
 
 
 def reload_nginx():
