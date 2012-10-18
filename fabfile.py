@@ -42,7 +42,8 @@ INSTALL_PACKAGES_DB = [
     "python-setuptools",
     "build-essential",
     "postgresql",
-    "postgresql-client"
+    "postgresql-client",
+    "redis-server"
 ]
 
 

@@ -3,3 +3,4 @@ psycopg2
 gunicorn
 south
 gevent
+django-celery-with-redis
