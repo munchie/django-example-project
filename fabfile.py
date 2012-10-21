@@ -101,8 +101,10 @@ def setup_vagrant_web():
     collectstatic()
     setup_nginx()
     setup_gunicorn()
+    setup_celery()
     gunicorn_config()
     nginx_config()
+    celery_config()
     start_web_processes()
 
 
@@ -124,6 +126,7 @@ def start_web_processes():
     """Starts nginx and gunicorn"""
     sudo("service nginx start")
     sudo("start gunicorn")
+    sudo("start celery")
 
 
 def stop_web_processes():
@@ -131,6 +134,7 @@ def stop_web_processes():
     with settings(warn_only=True):
         sudo("service nginx stop")
         sudo("stop gunicorn")
+        sudo("stop celery")
 
 
 def start_db_process():
@@ -236,6 +240,19 @@ def nginx_config():
     with cd("/etc/nginx"):
         sudo("rm -f nginx.conf")
         sudo("ln -sf %(code_dir)s/config/nginx/nginx.conf ." % env)
+
+
+def setup_celery():
+    """Setup after initial install of celery"""
+    # create celery log directory
+    sudo("mkdir -p /var/log/celery")
+
+
+def celery_config():
+    """Updates the celery upstart config file"""
+    with cd("/etc/init"):
+        sudo("rm -f celery.conf")
+        sudo("cp %(code_dir)s/config/celery/celery.conf ." % env)
 
 
 def clone_repo():

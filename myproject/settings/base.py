@@ -1,6 +1,5 @@
 import os
 import djcelery
-djcelery.setup_loader()
 
 PROJECT_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..'))
 
@@ -114,6 +113,7 @@ INSTALLED_APPS = (
     'django.contrib.staticfiles',
     'djcelery',
     'south',
+    'common',
     # Uncomment the next line to enable the admin:
     # 'django.contrib.admin',
     # Uncomment the next line to enable admin documentation:
@@ -146,5 +146,6 @@ LOGGING = {
 # Celery with redis configurations
 BROKER_URL = "redis://10.10.10.20"
 CELERY_RESULT_BACKEND = "redis://10.10.10.20"
-#CELERY_TASK_RESULT_EXPIRES = 60
+CELERY_TASK_RESULT_EXPIRES = 60
 #CELERYBEAT_SCHEDULER = "djcelery.schedulers.DatabaseScheduler"
+djcelery.setup_loader()

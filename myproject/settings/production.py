@@ -15,6 +15,8 @@ DATABASES = {
     }
 }
 
+# Celery beat configuration
+CELERYBEAT_SCHEDULER = "djcelery.schedulers.DatabaseScheduler"
 
 try:
     from local_settings import *
